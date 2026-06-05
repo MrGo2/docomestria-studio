@@ -178,6 +178,13 @@ function studioApp(sessionId) {
       if (!svg) return;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       if (!this.step || !this.pageWidthPts) return;
+      // Set viewBox imperatively — Alpine's `:viewBox` lowercases the attr to
+      // `viewbox` which SVG (case-sensitive) ignores, leaving the SVG in raw
+      // CSS-pixel coords and breaking the overlay-to-canvas alignment.
+      svg.setAttribute(
+        "viewBox",
+        `0 0 ${this.pageWidthPts} ${this.pageHeightPts}`
+      );
       const color = this.step.engine_color || "#6b7280";
       const bboxes = (this.step.bboxes || []).filter(
         (b) => !b.page || b.page === this.currentPage

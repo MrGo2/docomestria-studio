@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.4] - 2026-06-05
+
+### Fixed
+- Bbox overlays are now pixel-perfect aligned with the rendered PDF. Root
+  cause: Alpine's `:viewBox` binding lowercased the attribute to `viewbox`,
+  which SVG ignores (case-sensitive). Without a viewBox the SVG used raw CSS
+  pixels for rect coordinates instead of PDF points, drifting all overlays
+  by the canvas-to-page scale ratio. Fix: set `viewBox` imperatively from JS
+  with `svg.setAttribute("viewBox", ...)`, preserving the camelCase name.
+- Confirmed via dedicated research (parallel subagents using Context7 and
+  source-level inspection of LiteParse 2.0.5, Docling 2.97, pdfplumber 0.11.9,
+  and pdf.js 3.11): all four engines use top-left origin in PDF points after
+  docomestria's normalization, so the overlay math required no other changes.
+
 ## [0.2.3] - 2026-06-05
 
 ### Changed
