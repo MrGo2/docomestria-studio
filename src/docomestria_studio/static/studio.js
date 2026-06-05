@@ -32,6 +32,11 @@ function studioApp(sessionId) {
     selectedRowIdx: null, // which detail row is selected for drill-down
     autoMode: false,
     autoTimer: null,
+    // v0.2.7 — Merge modal state. `terminalStepCache` holds the terminal
+    // step's full JSON (including `merged_document`) so the Merge button can
+    // open instantly even mid-navigation.
+    mergeOpen: false,
+    terminalStepCache: null,
 
     currentPage: 1,
     totalPages: 1,
@@ -118,6 +123,9 @@ function studioApp(sessionId) {
           }
           if (data.status === "ready") {
             await this.loadStep(0);
+            // Prefetch terminal step so the Merge button can open instantly
+            // even if the user is still on an earlier step.
+            this.fetchTerminalStep();
             return;
           }
         } catch (err) {
@@ -279,6 +287,104 @@ function studioApp(sessionId) {
       }
       if (kind === "text_items") return "Item de texto";
       return "Detalle";
+    },
+
+    // -------- Merge modal: reconstructed document (v0.2.7) ----------------
+
+    async fetchTerminalStep() {
+      if (this.terminalStepCache) return this.terminalStepCache;
+      const idx = this.stepsDone - 1;
+      if (idx < 0) return null;
+      try {
+        const res = await fetch(`/api/session/${this.sessionId}/step/${idx}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        this.terminalStepCache = data;
+        return data;
+      } catch (e) {
+        return null;
+      }
+    },
+
+    hasMerged() {
+      const merged = this.terminalStepCache?.merged_document;
+      return Boolean(merged && Array.isArray(merged.blocks));
+    },
+
+    mergedBlocks() {
+      return this.terminalStepCache?.merged_document?.blocks || [];
+    },
+
+    renderBlock(block) {
+      if (!block) return "";
+      if (block.label === "table") return this.renderTable(block);
+      const tag = this.tagForLabel(block.label, block.level);
+      const spans = (block.spans || []).map((s) => this.renderSpan(s)).join("");
+      if (!spans) return "";
+      const cls = this.classForLabel(block.label);
+      return `<${tag} class="${cls}">${spans}</${tag}>`;
+    },
+
+    renderSpan(span) {
+      if (!span || !span.text) return "";
+      // Clamp font size so a rogue 1pt or 200pt span can't break the layout.
+      const size = Math.max(10, Math.min(28, span.font_size || 12));
+      const styleParts = [`font-size:${size}px`];
+      if (span.is_bold) styleParts.push("font-weight:700");
+      if (span.is_italic) styleParts.push("font-style:italic");
+      const style = styleParts.join(";");
+      return `<span style="${style}">${this.escapeHtml(span.text)}</span> `;
+    },
+
+    renderTable(block) {
+      const rows = (block.cells || [])
+        .map((row) => {
+          const cells = (row || [])
+            .map((cellSpans) => {
+              const inner = (cellSpans || [])
+                .map((s) => this.renderSpan(s))
+                .join("");
+              return `<td class="border border-slate-300 px-3 py-1.5 align-top text-sm text-slate-800">${inner || "&nbsp;"}</td>`;
+            })
+            .join("");
+          return `<tr>${cells}</tr>`;
+        })
+        .join("");
+      return `<table class="border-collapse my-4 w-full">${rows}</table>`;
+    },
+
+    tagForLabel(label, level) {
+      if (label === "section_header") return level === 1 ? "h1" : "h2";
+      if (label === "title") return "h1";
+      if (label === "list_item") return "li";
+      if (
+        label === "page_header" ||
+        label === "page_footer" ||
+        label === "caption"
+      ) return "div";
+      return "p";
+    },
+
+    classForLabel(label) {
+      const map = {
+        section_header: "text-slate-900 font-semibold mt-6 mb-2 text-base",
+        title: "text-2xl font-bold text-slate-900 mt-6 mb-3",
+        list_item: "ml-6 list-disc text-slate-800",
+        page_header: "text-xs text-slate-400 mt-4",
+        page_footer: "text-xs text-slate-400 mt-4",
+        caption: "text-xs italic text-slate-500",
+      };
+      return map[label] || "text-slate-800 leading-relaxed";
+    },
+
+    escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, (c) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[c]));
     },
 
     formatValue(value) {

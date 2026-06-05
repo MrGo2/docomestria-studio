@@ -61,8 +61,47 @@
         Modo: AI-asistido
       </span>
       {% endif %}
-      <a href="/" class="text-xs text-slate-400 hover:text-indigo-600">Nuevo PDF</a>
+      <div class="flex items-center gap-3">
+        <button
+          x-show="status === 'ready' && hasMerged()"
+          @click="mergeOpen = true"
+          class="inline-flex items-center gap-1.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1 text-xs font-medium"
+        >
+          <span>Ver documento reconstruido</span>
+        </button>
+        <a href="/" class="text-xs text-slate-400 hover:text-indigo-600">Nuevo PDF</a>
+      </div>
     </div>
+
+    <!-- Merge modal: reconstructed document (v0.2.7) -->
+    <template x-if="mergeOpen">
+      <div
+        class="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-6"
+        @click="mergeOpen = false"
+        @keydown.escape.window="mergeOpen = false"
+      >
+        <div
+          class="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+          @click.stop
+        >
+          <div class="sticky top-0 bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-semibold">Documento reconstruido</h2>
+              <p class="text-xs text-slate-500">Estructura semantica de Docling + formato de caracter de LiteParse</p>
+            </div>
+            <button @click="mergeOpen = false" class="text-slate-400 hover:text-slate-700 text-sm">Cerrar</button>
+          </div>
+          <div class="px-8 py-6 space-y-2">
+            <template x-for="(block, bi) in mergedBlocks()" :key="bi">
+              <div x-html="renderBlock(block)"></div>
+            </template>
+            <template x-if="!mergedBlocks().length">
+              <p class="text-sm text-slate-400 italic">El documento no contiene bloques semanticos.</p>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Loading state -->
     <div x-show="status === 'processing'" class="text-center py-12">

@@ -482,3 +482,143 @@ def test_details_none_for_steps_without_engine_data(fake_step_factory):
     )
     data = serialize_step(step)
     assert data["details"] is None
+
+
+# ============================================================================
+# v0.2.7 — merged_document surfacing
+# ============================================================================
+
+
+def _sample_merged_document() -> dict:
+    """A minimal but realistic _merged_document payload."""
+    return {
+        "blocks": [
+            {
+                "label": "section_header",
+                "level": 1,
+                "layer": "body",
+                "page": 1,
+                "bbox": [10.0, 10.0, 200.0, 20.0],
+                "spans": [
+                    {
+                        "text": "Datos Peticion",
+                        "font_name": "Helvetica-Bold",
+                        "font_size": 12.0,
+                        "is_bold": True,
+                        "is_italic": False,
+                        "bbox": [12.0, 12.0, 80.0, 14.0],
+                    }
+                ],
+            },
+            {
+                "label": "table",
+                "level": None,
+                "layer": "body",
+                "page": 1,
+                "bbox": [10.0, 50.0, 200.0, 80.0],
+                "cells": [
+                    [
+                        [
+                            {
+                                "text": "N Procedimiento",
+                                "font_name": "Helvetica-Bold",
+                                "font_size": 10.0,
+                                "is_bold": True,
+                                "is_italic": False,
+                                "bbox": [12.0, 52.0, 60.0, 10.0],
+                            }
+                        ],
+                        [
+                            {
+                                "text": "987-15",
+                                "font_name": "Helvetica",
+                                "font_size": 10.0,
+                                "is_bold": False,
+                                "is_italic": False,
+                                "bbox": [80.0, 52.0, 40.0, 10.0],
+                            }
+                        ],
+                    ]
+                ],
+            },
+        ],
+        "page_count": 1,
+    }
+
+
+def test_serialize_step_surfaces_merged_document_on_terminal(
+    fake_step_factory, fake_result_factory
+):
+    merged = _sample_merged_document()
+    step = fake_step_factory(
+        name="complete",
+        title="Listo",
+        explanation="",
+        engine="system",
+        step_index=12,
+        total_steps=13,
+        is_terminal=True,
+        payload={"result": fake_result_factory(), "_merged_document": merged},
+    )
+    data = serialize_step(step)
+    # JSON-safe round-trip.
+    json.dumps(data)
+    assert data["merged_document"] == merged
+    # Internal `_merged_document` key must not leak into the user-facing
+    # payload summary (keys starting with `_` are stripped).
+    assert "_merged_document" not in data["payload"]
+
+
+def test_serialize_step_does_not_surface_merged_on_non_terminal(
+    fake_step_factory,
+):
+    merged = _sample_merged_document()
+    step = fake_step_factory(
+        name="extract_liteparse",
+        title="x",
+        explanation="",
+        engine="liteparse",
+        step_index=1,
+        total_steps=13,
+        is_terminal=False,
+        payload={"_merged_document": merged},
+    )
+    data = serialize_step(step)
+    # Non-terminal steps must never expose merged_document, even if the
+    # payload happens to contain it.
+    assert "merged_document" not in data
+
+
+def test_serialize_step_omits_merged_when_missing(
+    fake_step_factory, fake_result_factory
+):
+    step = fake_step_factory(
+        name="complete",
+        title="Listo",
+        explanation="",
+        engine="system",
+        step_index=12,
+        total_steps=13,
+        is_terminal=True,
+        payload={"result": fake_result_factory()},
+    )
+    data = serialize_step(step)
+    assert "merged_document" not in data
+
+
+def test_serialize_step_empty_merged_is_omitted(
+    fake_step_factory, fake_result_factory
+):
+    step = fake_step_factory(
+        name="complete",
+        title="Listo",
+        explanation="",
+        engine="system",
+        step_index=12,
+        total_steps=13,
+        is_terminal=True,
+        payload={"result": fake_result_factory(), "_merged_document": {}},
+    )
+    data = serialize_step(step)
+    # Empty dict is falsy — UI has nothing to render, so we skip the key.
+    assert "merged_document" not in data

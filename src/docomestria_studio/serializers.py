@@ -154,7 +154,7 @@ def serialize_step(step: PipelineStep) -> dict[str, Any]:
             )
         except TypeError:
             continue
-    return {
+    out: dict[str, Any] = {
         "name": step.name,
         "title": step.title,
         "explanation": step.explanation,
@@ -173,6 +173,14 @@ def serialize_step(step: PipelineStep) -> dict[str, Any]:
         "details": details,
         "final": _serialize_final(step),
     }
+    # v0.2.7: surface the reconstructed-document payload on the terminal step
+    # only. We keep it at the top level (not nested in `details`) because the
+    # UI reads it directly to render the Merge modal.
+    if step.is_terminal:
+        merged = (step.payload or {}).get("_merged_document")
+        if merged:
+            out["merged_document"] = merged
+    return out
 
 
 # ============================================================================ details
