@@ -209,6 +209,35 @@ function studioApp(sessionId) {
           rect.appendChild(title);
         }
         svg.appendChild(rect);
+        // Draw the engine-supplied label INSIDE the rect so Docling and
+        // pdfplumber are visually distinguishable in the overlay. LiteParse
+        // bboxes don't carry labels (one word per box would clutter).
+        if (bbox.label && bbox.h >= 6) {
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          const fontSize = Math.max(6, Math.min(10, bbox.h * 0.6));
+          text.setAttribute("x", String(bbox.x + 2));
+          text.setAttribute("y", String(bbox.y + Math.min(bbox.h - 1, fontSize + 1)));
+          text.setAttribute("font-size", String(fontSize));
+          text.setAttribute("fill", color);
+          text.setAttribute("font-weight", "bold");
+          text.setAttribute("opacity", "0.85");
+          text.setAttribute("pointer-events", "none");
+          text.textContent = bbox.label;
+          svg.appendChild(text);
+        }
+      }
+    },
+
+    detailsHeading(details) {
+      if (!details) return "";
+      switch (details.kind) {
+        case "text_items": return "Texto extraido";
+        case "blocks": return "Bloques semanticos";
+        case "visual_rects": return "Rectangulos visuales";
+        case "fused_items": return "Items fusionados";
+        case "pairs": return `Campos emparejados (${details.matched_count}/${details.total})`;
+        case "typed_fields": return `Campos tipados (${details.ok_count}/${details.total})`;
+        default: return "Detalle";
       }
     },
 

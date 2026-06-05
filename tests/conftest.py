@@ -73,6 +73,8 @@ class _FakeStep:
         self.is_terminal = is_terminal
         self.is_error = is_error
         self.error_message = error_message
+        self.fusion = None
+        self.typed_fields = None
 
     @property
     def progress(self) -> float:
