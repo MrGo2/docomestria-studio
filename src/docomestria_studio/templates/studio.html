@@ -34,8 +34,8 @@
         <span x-text="step?.engine || ''"></span>
       </span>
     </div>
-    <div class="relative bg-slate-100 rounded-md overflow-auto" style="max-height:75vh">
-      <canvas x-ref="pdfCanvas" class="block mx-auto"></canvas>
+    <div class="relative bg-slate-100 rounded-md overflow-y-auto overflow-x-hidden" style="max-height:75vh">
+      <canvas x-ref="pdfCanvas" class="block mx-auto max-w-full"></canvas>
       <svg
         x-ref="overlay"
         class="absolute top-0 left-0 pointer-events-none"

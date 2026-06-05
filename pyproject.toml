@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "docomestria-studio"
-version = "0.2.1"
+version = "0.2.2"
 description = "Interactive visual viewer for docomestria — watch PDF extraction step-by-step"
 readme = "README.md"
 license = { text = "MIT" }

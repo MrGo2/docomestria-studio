@@ -61,8 +61,13 @@ function studioApp(sessionId) {
         try { renderTask.cancel(); } catch (e) { /* ignore */ }
       }
       const page = await pdfDoc.getPage(pageNum);
-      viewport = page.getViewport({ scale: this.pdfScale });
       const canvas = this.$refs.pdfCanvas;
+      const container = canvas.parentElement;
+      // Fit viewport to container width (account for ~16px padding/scrollbar).
+      const baseViewport = page.getViewport({ scale: 1 });
+      const targetWidth = Math.max(200, (container?.clientWidth || 600) - 16);
+      this.pdfScale = targetWidth / baseViewport.width;
+      viewport = page.getViewport({ scale: this.pdfScale });
       const ctx = canvas.getContext("2d");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
