@@ -40,12 +40,17 @@ def test_engine_colors_cover_documented_engines():
         "provenance",
         "transform",
         "system",
+        "pairing",
     }
     assert expected.issubset(set(ENGINE_COLORS.keys()))
     # All values must be valid hex colors.
     for color in ENGINE_COLORS.values():
         assert color.startswith("#")
         assert len(color) == 7
+
+
+def test_pairing_engine_color_is_teal():
+    assert ENGINE_COLORS["pairing"] == "#14b8a6"
 
 
 def test_serialize_step_basic(fake_step_factory, fake_bbox_factory):

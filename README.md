@@ -14,20 +14,28 @@ bboxes it touched directly on top of the PDF, color-coded by engine.
 Built for non-technical audiences — sales demos, training, debugging
 extraction issues without reading logs.
 
+## Two modes
+
+| Mode | LLM | API key | Cost | Best for |
+|------|-----|---------|------|----------|
+| **Determinista** (default) | none | not required | free | Structured forms with labels (contratos, fichas, alta de cliente) |
+| **AI-asistido** | OpenRouter (`google/gemini-2.5-flash-lite`) | required | ~$0.0001–0.001 / PDF | Free text, scanned docs, complex layouts |
+
+Pick the mode on the landing page before uploading. Deterministic mode runs
+the schema-driven label pairing path (no network calls); AI mode forwards a
+fused context to the model and binds the response back to bboxes.
+
 ## Setup
 
 ```bash
 pip install docomestria-studio
-export OPENROUTER_API_KEY=sk-or-v1-...
 docomestria-studio
 # opens on http://127.0.0.1:5050
 ```
 
-By default it uses `google/gemini-2.5-flash-lite` via OpenRouter. Override with
-`OPENROUTER_MODEL=<slug>` if you want a different model.
-
-If `OPENROUTER_API_KEY` is missing the server still starts — uploads return a
-friendly setup-required message until you set the key.
+`OPENROUTER_API_KEY` is **optional** — only needed for AI-assisted mode. The
+deterministic path works offline. Override the AI model with
+`OPENROUTER_MODEL=<slug>` if you want a different one.
 
 ## Who it's for
 
@@ -72,7 +80,7 @@ flowchart LR
 
 | Env var | Default | Meaning |
 |---------|---------|---------|
-| `OPENROUTER_API_KEY` | _(required)_ | OpenRouter API key |
+| `OPENROUTER_API_KEY` | _(optional)_ | OpenRouter API key — only required for AI-assisted mode |
 | `OPENROUTER_MODEL` | `google/gemini-2.5-flash-lite` | Model slug |
 | `STUDIO_HOST` | `127.0.0.1` | Bind host |
 | `STUDIO_PORT` | `5050` | Bind port |

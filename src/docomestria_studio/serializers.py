@@ -18,6 +18,7 @@ ENGINE_COLORS: dict[str, str] = {
     "provenance": "#06b6d4",
     "transform": "#eab308",
     "system": "#6b7280",
+    "pairing": "#14b8a6",
 }
 
 

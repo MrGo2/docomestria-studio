@@ -84,9 +84,16 @@ class _FakeStep:
 class _FakePipeline:
     """A pipeline that yields a deterministic sequence of fake steps."""
 
-    def __init__(self, *, raise_in_stream: bool = False, delay: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        raise_in_stream: bool = False,
+        delay: float = 0.0,
+        mode: str = "deterministic",
+    ) -> None:
         self.raise_in_stream = raise_in_stream
         self.delay = delay
+        self.mode = mode
 
     def stream(self, pdf_path):  # noqa: ARG002 - signature parity with real pipeline
         if self.raise_in_stream:
@@ -172,8 +179,13 @@ class _FakeResult:
 
 
 def fake_pipeline_factory(*, raise_in_stream: bool = False, delay: float = 0.0):
-    def factory():
-        return _FakePipeline(raise_in_stream=raise_in_stream, delay=delay)
+    """Build a mode-aware factory. Stores the requested mode on the pipeline
+    so tests can assert which path was taken."""
+
+    def factory(mode: str = "deterministic"):
+        return _FakePipeline(
+            raise_in_stream=raise_in_stream, delay=delay, mode=mode
+        )
 
     return factory
 

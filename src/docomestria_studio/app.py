@@ -27,6 +27,8 @@ from .runner import PipelineFactory, default_pipeline_factory, start_background_
 from .serializers import serialize_step
 from .sessions import SessionStore
 
+_VALID_MODES = ("deterministic", "ai")
+
 
 def create_app(
     config: StudioConfig | None = None,
@@ -40,9 +42,9 @@ def create_app(
     config:
         Optional pre-built `StudioConfig`. Tests pass an explicit one.
     pipeline_factory:
-        Zero-arg callable returning something with a `.stream(pdf_path)`
-        method. Tests inject a fake factory; production uses the OpenRouter-
-        backed default built from the config.
+        Mode-aware callable ``factory(mode) -> pipeline``. Tests inject a
+        fake factory; production uses the docomestria-backed default built
+        from the config.
     """
     cfg = config or load_config()
     app = Flask(
@@ -79,15 +81,19 @@ def _register_routes(
     def index() -> Any:
         return render_template(
             "index.html",
-            is_ready=cfg.is_ready,
+            has_api_key=cfg.is_ready,
             model=cfg.openrouter_model,
             max_mb=cfg.upload_max_mb,
         )
 
     @app.post("/upload")
     def upload() -> Any:
-        if not cfg.is_ready:
+        mode = request.form.get("mode", "deterministic").strip().lower()
+        if mode not in _VALID_MODES:
+            return jsonify({"error": f"Unknown mode: {mode}"}), 400
+        if mode == "ai" and not cfg.is_ready:
             return _setup_required_response()
+
         file = request.files.get("pdf")
         if file is None or not file.filename:
             return jsonify({"error": "No file uploaded."}), 400
@@ -100,7 +106,7 @@ def _register_routes(
         tmp_path = upload_dir / f"upload-{file.filename}"
         file.save(tmp_path)
 
-        session = store.create(tmp_path)
+        session = store.create(tmp_path, mode=mode)
         # Rename the file to embed the session id, avoiding collisions when
         # multiple users upload the same filename.
         final_path = upload_dir / f"{session.id}.pdf"
@@ -119,6 +125,7 @@ def _register_routes(
             "studio.html",
             session_id=session.id,
             model=cfg.openrouter_model,
+            mode=session.mode,
         )
 
     @app.get("/api/session/<session_id>/status")
@@ -129,6 +136,7 @@ def _register_routes(
         return jsonify(
             {
                 "status": session.status,
+                "mode": session.mode,
                 "steps_done": len(session.steps),
                 "steps_total": _total_steps(session),
                 "error": session.error,
@@ -184,8 +192,8 @@ def _setup_required_response() -> Any:
             {
                 "error": "Setup required",
                 "detail": (
-                    "Set OPENROUTER_API_KEY in your environment, then restart"
-                    " the server. See the README for details."
+                    "AI-assisted mode requires OPENROUTER_API_KEY. Set the"
+                    " variable and restart, or pick the deterministic mode."
                 ),
             }
         ),
@@ -197,8 +205,9 @@ def _total_steps(session: Any) -> int:
     """Best-effort total step count from the latest captured step."""
     if not session.steps:
         # Mirror docomestria's canonical sequence length to keep progress
-        # monotonic before the first step arrives.
-        return 13
+        # monotonic before the first step arrives. Deterministic mode is
+        # shorter (~9 steps) than the LLM path (~13).
+        return 9 if session.mode == "deterministic" else 13
     return session.steps[-1].total_steps
 
 
@@ -209,8 +218,8 @@ def main() -> None:
     print(f"docomestria-studio — http://{cfg.host}:{cfg.port}")
     if not cfg.is_ready:
         print(
-            "WARNING: OPENROUTER_API_KEY is not set. The viewer will refuse"
-            " uploads until you set it and restart."
+            "INFO: OPENROUTER_API_KEY is not set. Deterministic mode is"
+            " available; AI-assisted mode will be disabled until you set it."
         )
     app.run(host=cfg.host, port=cfg.port, debug=cfg.debug)
 

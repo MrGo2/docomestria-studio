@@ -1,42 +1,59 @@
-"""Wrap `docomestria.Pipeline.stream()` into a session-backed background run."""
+"""Wrap `docomestria.Pipeline.stream()` into a session-backed background run.
+
+Two modes are supported:
+
+- ``deterministic`` — builds a `Pipeline(llm=None)` which runs the schema-
+  driven label pairing path. No API key, no network, no cost.
+- ``ai`` — builds a `Pipeline(llm=OpenRouter(...))`. Requires an API key
+  in the config.
+"""
 
 from __future__ import annotations
 
 import threading
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from .sessions import StudioSession
 
 # Type alias for the pipeline factory injected by the app / tests.
-PipelineFactory = Callable[[], Any]
+# It receives the desired mode and returns a pipeline-like object.
+Mode = Literal["deterministic", "ai"]
+PipelineFactory = Callable[[Mode], Any]
 
 
-def _default_pipeline_factory(api_key: str | None, model: str) -> Any:
-    """Build the default OpenRouter-backed pipeline.
+def _build_pipeline(mode: Mode, api_key: str | None, model: str) -> Any:
+    """Build a docomestria Pipeline for the requested mode.
 
     Lazy-imports so test runs that pass an explicit factory don't pull in
     docomestria's heavy engine dependencies.
     """
     from docomestria import Pipeline
-    from docomestria.pipeline.providers import OpenRouter
 
     from .default_schema import build_default_schema
 
-    if not api_key:
-        raise RuntimeError(
-            "OPENROUTER_API_KEY is required to build the default pipeline."
-        )
-    llm = OpenRouter(api_key=api_key, model=model)
-    return Pipeline(schema=build_default_schema(), llm=llm, cache_dir=None)
+    schema = build_default_schema()
+
+    if mode == "deterministic":
+        return Pipeline(schema=schema, llm=None, cache_dir=None)
+    if mode == "ai":
+        if not api_key:
+            raise RuntimeError(
+                "OPENROUTER_API_KEY is required for AI-assisted mode."
+            )
+        from docomestria.pipeline.providers import OpenRouter
+
+        llm = OpenRouter(api_key=api_key, model=model)
+        return Pipeline(schema=schema, llm=llm, cache_dir=None)
+    raise ValueError(f"Unknown mode: {mode}")
 
 
 def default_pipeline_factory(api_key: str | None, model: str) -> PipelineFactory:
-    """Return a zero-arg factory bound to the given API key and model."""
+    """Return a mode-aware factory bound to the given API key and model."""
 
-    def factory() -> Any:
-        return _default_pipeline_factory(api_key, model)
+    def factory(mode: Mode) -> Any:
+        return _build_pipeline(mode, api_key, model)
 
     return factory
 
@@ -52,7 +69,7 @@ def run_pipeline_into_session(
     exception is raised. Designed to be called from a background thread.
     """
     try:
-        pipe = pipeline_factory()
+        pipe = pipeline_factory(session.mode)
         for step in pipe.stream(pdf_path):
             session.steps.append(step)
         session.status = "ready"
@@ -77,6 +94,7 @@ def start_background_run(
 
 
 __all__ = [
+    "Mode",
     "PipelineFactory",
     "default_pipeline_factory",
     "run_pipeline_into_session",

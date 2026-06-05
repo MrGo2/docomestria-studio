@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Viewer — docomestria-studio{% endblock %}
-{% block subtitle %}Sesión: {{ session_id[:8] }} — {{ model }}{% endblock %}
+{% block subtitle %}Sesión: {{ session_id[:8] }}{% if mode == 'ai' %} — {{ model }}{% endif %}{% endblock %}
 
 {% block content %}
 <div
@@ -47,6 +47,22 @@
 
   <!-- Right: step panel -->
   <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+    <!-- Mode badge (always visible) -->
+    <div class="mb-4 flex items-center justify-between">
+      {% if mode == 'deterministic' %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-teal-100 px-2.5 py-1 text-xs font-medium text-teal-800">
+        <span class="h-1.5 w-1.5 rounded-full bg-teal-500"></span>
+        Modo: Determinista
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-2.5 py-1 text-xs font-medium text-pink-800">
+        <span class="h-1.5 w-1.5 rounded-full bg-pink-500"></span>
+        Modo: AI-asistido
+      </span>
+      {% endif %}
+      <a href="/" class="text-xs text-slate-400 hover:text-indigo-600">Nuevo PDF</a>
+    </div>
+
     <!-- Loading state -->
     <div x-show="status === 'processing'" class="text-center py-12">
       <div class="inline-block w-8 h-8 border-4 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>

@@ -20,6 +20,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 Status = Literal["processing", "ready", "error"]
+Mode = Literal["deterministic", "ai"]
 
 
 @dataclass
@@ -28,6 +29,7 @@ class StudioSession:
 
     id: str
     pdf_path: Path
+    mode: Mode = "deterministic"
     status: Status = "processing"
     steps: list[PipelineStep] = field(default_factory=list)
     error: str | None = None
@@ -46,9 +48,11 @@ class SessionStore:
         self._sessions: dict[str, StudioSession] = {}
         self._lock = threading.Lock()
 
-    def create(self, pdf_path: Path) -> StudioSession:
+    def create(self, pdf_path: Path, mode: Mode = "deterministic") -> StudioSession:
         """Create a new session and return it."""
-        session = StudioSession(id=str(uuid.uuid4()), pdf_path=pdf_path)
+        session = StudioSession(
+            id=str(uuid.uuid4()), pdf_path=pdf_path, mode=mode
+        )
         with self._lock:
             self._sessions[session.id] = session
         return session
@@ -88,4 +92,4 @@ class SessionStore:
         return len(self._sessions)
 
 
-__all__ = ["SessionStore", "StudioSession", "Status"]
+__all__ = ["SessionStore", "StudioSession", "Status", "Mode"]

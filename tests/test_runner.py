@@ -71,12 +71,64 @@ def test_runner_with_real_step_dataclass_works(tmp_path):
         def stream(self, _path):
             yield real_step
 
-    def factory():
+    def factory(_mode):
         return _RealStepPipeline()
 
     run_pipeline_into_session(session, session.pdf_path, factory)
     assert session.status == "ready"
     assert session.steps[0].name == "start"
+
+
+def test_runner_passes_mode_to_factory(tmp_path):
+    """The runner forwards session.mode to the pipeline factory."""
+    store = SessionStore()
+    pdf = tmp_path / "doc.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n%fake\n")
+    session = store.create(pdf, mode="ai")
+
+    captured = {}
+
+    class _NoopPipe:
+        def stream(self, _path):
+            return iter(())
+
+    def factory(mode):
+        captured["mode"] = mode
+        return _NoopPipe()
+
+    run_pipeline_into_session(session, session.pdf_path, factory)
+    assert captured["mode"] == "ai"
+
+
+def test_default_factory_deterministic_builds_pipeline_without_key():
+    """Deterministic mode must not require an API key."""
+    from docomestria_studio.runner import default_pipeline_factory
+
+    factory = default_pipeline_factory(None, "google/gemini-2.5-flash-lite")
+    pipe = factory("deterministic")
+    # The real docomestria Pipeline exposes llm=None in deterministic mode.
+    assert getattr(pipe, "llm", "missing") is None
+
+
+def test_default_factory_ai_requires_key():
+    """AI mode without an API key raises a clear error."""
+    import pytest
+
+    from docomestria_studio.runner import default_pipeline_factory
+
+    factory = default_pipeline_factory(None, "google/gemini-2.5-flash-lite")
+    with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY"):
+        factory("ai")
+
+
+def test_default_factory_ai_with_key_builds_pipeline():
+    """AI mode with a key produces a Pipeline configured with an OpenRouter llm."""
+    from docomestria_studio.runner import default_pipeline_factory
+
+    factory = default_pipeline_factory("fake-key", "google/gemini-2.5-flash-lite")
+    pipe = factory("ai")
+    assert getattr(pipe, "llm", None) is not None
+    assert getattr(pipe.llm, "api_key", "") == "fake-key"
 
 
 def test_session_store_basics(tmp_path):
