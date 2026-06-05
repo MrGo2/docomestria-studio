@@ -82,13 +82,13 @@
     <template x-if="status === 'ready' && step">
       <div class="flex-1 flex flex-col">
         <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
-          <span>Paso <span x-text="(currentIndex + 1)"></span> de <span x-text="step.total_steps"></span></span>
+          <span>Paso <span x-text="(currentIndex + 1)"></span> de <span x-text="stepsDone"></span></span>
           <span x-text="`${step.elapsed_ms} ms`"></span>
         </div>
         <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
           <div
             class="h-full transition-all"
-            :style="`width:${(step.progress * 100).toFixed(0)}%; background:${step.engine_color}`"
+            :style="`width:${(((currentIndex + 1) / stepsDone) * 100).toFixed(0)}%; background:${step.engine_color}`"
           ></div>
         </div>
 
@@ -164,7 +164,7 @@
           <button
             @click="next()"
             class="flex-1 px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30"
-            :disabled="currentIndex >= steps.length - 1"
+            :disabled="currentIndex >= stepsDone - 1"
           >Siguiente &rarr;</button>
           <button
             @click="toggleAuto()"

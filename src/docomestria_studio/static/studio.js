@@ -9,11 +9,18 @@
  *   - Provide Next / Back / Auto / Skip controls.
  */
 function studioApp(sessionId) {
+  // Kept OUT of reactive state: pdf.js objects use private class fields
+  // that throw when accessed through Alpine's reactive Proxy.
+  let pdfDoc = null;
+  let viewport = null;
+  let renderTask = null;
+  let initialized = false;
+
   return {
     sessionId,
     status: "processing",
     stepsDone: 0,
-    stepsTotal: 13,
+    stepsTotal: 0,
     errorMessage: "",
 
     steps: [],            // cached step JSON, indexed
@@ -22,15 +29,15 @@ function studioApp(sessionId) {
     autoMode: false,
     autoTimer: null,
 
-    pdfDoc: null,
     currentPage: 1,
     totalPages: 1,
     canvasWidth: 0,
     canvasHeight: 0,
     pdfScale: 1.5,
-    viewport: null,
 
     init() {
+      if (initialized) return;
+      initialized = true;
       this.loadPdf();
       this.pollStatus();
     },
@@ -40,8 +47,8 @@ function studioApp(sessionId) {
         const loadingTask = window.pdfjsLib.getDocument(
           `/api/session/${this.sessionId}/pdf`
         );
-        this.pdfDoc = await loadingTask.promise;
-        this.totalPages = this.pdfDoc.numPages;
+        pdfDoc = await loadingTask.promise;
+        this.totalPages = pdfDoc.numPages;
         await this.renderPage(1);
       } catch (err) {
         console.error("PDF load failed:", err);
@@ -49,16 +56,27 @@ function studioApp(sessionId) {
     },
 
     async renderPage(pageNum) {
-      if (!this.pdfDoc) return;
-      const page = await this.pdfDoc.getPage(pageNum);
-      this.viewport = page.getViewport({ scale: this.pdfScale });
+      if (!pdfDoc) return;
+      if (renderTask) {
+        try { renderTask.cancel(); } catch (e) { /* ignore */ }
+      }
+      const page = await pdfDoc.getPage(pageNum);
+      viewport = page.getViewport({ scale: this.pdfScale });
       const canvas = this.$refs.pdfCanvas;
       const ctx = canvas.getContext("2d");
-      canvas.width = this.viewport.width;
-      canvas.height = this.viewport.height;
-      this.canvasWidth = this.viewport.width;
-      this.canvasHeight = this.viewport.height;
-      await page.render({ canvasContext: ctx, viewport: this.viewport }).promise;
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      this.canvasWidth = viewport.width;
+      this.canvasHeight = viewport.height;
+      renderTask = page.render({ canvasContext: ctx, viewport: viewport });
+      try {
+        await renderTask.promise;
+      } catch (e) {
+        if (e?.name !== "RenderingCancelledException") throw e;
+        return;
+      } finally {
+        renderTask = null;
+      }
       this.currentPage = pageNum;
       this.drawOverlay();
     },
@@ -119,9 +137,8 @@ function studioApp(sessionId) {
     },
 
     next() {
-      if (this.step && this.currentIndex < this.step.total_steps - 1) {
-        const target = Math.min(this.currentIndex + 1, this.stepsDone - 1);
-        if (target > this.currentIndex) this.loadStep(target);
+      if (this.currentIndex < this.stepsDone - 1) {
+        this.loadStep(this.currentIndex + 1);
       }
     },
 
@@ -154,7 +171,7 @@ function studioApp(sessionId) {
       const svg = this.$refs.overlay;
       if (!svg) return;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
-      if (!this.step || !this.viewport) return;
+      if (!this.step || !viewport) return;
       const color = this.step.engine_color || "#6b7280";
       const bboxes = (this.step.bboxes || []).filter(
         (b) => !b.page || b.page === this.currentPage

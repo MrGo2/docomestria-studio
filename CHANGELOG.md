@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-06-05
+
+### Fixed
+- PDF rendering no longer fails with "Cannot read private member #d" — `pdf.js`
+  document and viewport objects are kept in closure variables instead of
+  Alpine's reactive Proxy (private class fields cannot survive proxying).
+- Step counter now shows the correct total for the active mode (Paso X de 9
+  in deterministic, Paso X de 13 in AI). Was previously hardcoded to 13.
+- Next button is no longer stuck disabled when only the first step has loaded.
+  Bound now uses `stepsDone` instead of the locally cached `steps.length`.
+- Canvas double-render race condition during Alpine double-init is avoided
+  with an `initialized` guard and a cancellable `renderTask`.
+- Requires `docomestria>=0.6.1` which also reports `total_steps` correctly
+  from the server side.
+
 ## [0.2.0] - 2026-06-05
 
 ### Added
