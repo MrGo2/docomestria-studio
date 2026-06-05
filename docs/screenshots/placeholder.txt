@@ -1,0 +1,2 @@
+Screenshots will be added in a follow-up commit. Run the dev server
+locally with `python app.py` and upload a PDF to see the viewer.

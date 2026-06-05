@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Viewer — docomestria-studio{% endblock %}
+{% block subtitle %}Sesión: {{ session_id[:8] }} — {{ model }}{% endblock %}
+
+{% block content %}
+<div
+  x-data="studioApp('{{ session_id }}')"
+  x-init="init()"
+  class="grid lg:grid-cols-2 gap-6"
+>
+  <!-- Left: PDF + overlay -->
+  <section class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="flex items-center justify-between mb-3 text-sm">
+      <div class="flex items-center gap-2">
+        <button
+          @click="prevPage()"
+          class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-30"
+          :disabled="currentPage <= 1"
+        >&larr;</button>
+        <span class="text-slate-500">
+          Página <span x-text="currentPage"></span> / <span x-text="totalPages"></span>
+        </span>
+        <button
+          @click="nextPage()"
+          class="px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-30"
+          :disabled="currentPage >= totalPages"
+        >&rarr;</button>
+      </div>
+      <span class="text-xs text-slate-400" x-show="step">
+        <span
+          class="inline-block w-2 h-2 rounded-full mr-1"
+          :style="`background:${step?.engine_color || '#6b7280'}`"
+        ></span>
+        <span x-text="step?.engine || ''"></span>
+      </span>
+    </div>
+    <div class="relative bg-slate-100 rounded-md overflow-auto" style="max-height:75vh">
+      <canvas x-ref="pdfCanvas" class="block mx-auto"></canvas>
+      <svg
+        x-ref="overlay"
+        class="absolute top-0 left-0 pointer-events-none"
+        :width="canvasWidth"
+        :height="canvasHeight"
+      ></svg>
+    </div>
+  </section>
+
+  <!-- Right: step panel -->
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm flex flex-col">
+    <!-- Loading state -->
+    <div x-show="status === 'processing'" class="text-center py-12">
+      <div class="inline-block w-8 h-8 border-4 border-slate-200 border-t-indigo-500 rounded-full animate-spin"></div>
+      <p class="mt-4 text-sm text-slate-500">
+        Procesando PDF... <span x-text="stepsDone"></span> / <span x-text="stepsTotal"></span> pasos
+      </p>
+    </div>
+
+    <!-- Error state -->
+    <div x-show="status === 'error'" class="text-center py-12">
+      <p class="text-red-600 font-medium">Error</p>
+      <p class="text-sm text-slate-500 mt-2" x-text="errorMessage"></p>
+      <a href="/" class="mt-4 inline-block text-sm text-indigo-600 hover:underline">Volver</a>
+    </div>
+
+    <!-- Ready state -->
+    <template x-if="status === 'ready' && step">
+      <div class="flex-1 flex flex-col">
+        <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
+          <span>Paso <span x-text="(currentIndex + 1)"></span> de <span x-text="step.total_steps"></span></span>
+          <span x-text="`${step.elapsed_ms} ms`"></span>
+        </div>
+        <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
+          <div
+            class="h-full transition-all"
+            :style="`width:${(step.progress * 100).toFixed(0)}%; background:${step.engine_color}`"
+          ></div>
+        </div>
+
+        <h2 class="text-lg font-semibold tracking-tight" x-text="step.title"></h2>
+        <p class="text-xs uppercase tracking-wider text-slate-400 mt-0.5" x-text="step.engine"></p>
+        <p class="text-sm text-slate-600 mt-3" x-text="step.explanation"></p>
+
+        <!-- Payload summary -->
+        <div class="mt-4 space-y-1.5 text-sm">
+          <template x-for="(value, key) in step.payload" :key="key">
+            <div class="flex gap-2 text-slate-700">
+              <span class="text-slate-400" x-text="key + ':'"></span>
+              <span class="font-mono text-xs truncate" x-text="formatValue(value)"></span>
+            </div>
+          </template>
+        </div>
+
+        <!-- Terminal step extras -->
+        <template x-if="step.is_terminal && step.final">
+          <div class="mt-5 border-t border-slate-200 pt-4 space-y-4">
+            <div class="flex justify-between text-sm">
+              <div>
+                <p class="text-slate-400 text-xs uppercase">Coste</p>
+                <p class="font-mono" x-text="`$${step.final.cost?.usd?.toFixed(4) || '0.0000'}`"></p>
+              </div>
+              <div>
+                <p class="text-slate-400 text-xs uppercase">Duración</p>
+                <p class="font-mono" x-text="`${step.final.duration_ms} ms`"></p>
+              </div>
+              <div>
+                <p class="text-slate-400 text-xs uppercase">Tokens</p>
+                <p class="font-mono" x-text="`${step.final.cost?.tokens_in || 0} / ${step.final.cost?.tokens_out || 0}`"></p>
+              </div>
+            </div>
+
+            <div>
+              <p class="text-xs uppercase text-slate-400 mb-2">Campos extraídos</p>
+              <div class="space-y-1 max-h-48 overflow-y-auto">
+                <template x-for="tf in step.final.typed_fields" :key="tf.field">
+                  <div class="text-xs flex gap-2 items-baseline">
+                    <span
+                      class="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      :class="tf.ok ? 'bg-green-500' : 'bg-amber-500'"
+                    ></span>
+                    <span class="text-slate-500 truncate" x-text="tf.field"></span>
+                    <span class="font-mono text-slate-800 truncate" x-text="tf.normalized || tf.raw"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+
+            <div x-show="step.final.issues && step.final.issues.length">
+              <p class="text-xs uppercase text-slate-400 mb-2">Avisos</p>
+              <div class="space-y-1">
+                <template x-for="issue in step.final.issues" :key="issue.field + issue.type">
+                  <div class="text-xs text-amber-700">
+                    <span class="font-medium" x-text="issue.field"></span>:
+                    <span x-text="issue.detail"></span>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <!-- Controls -->
+        <div class="mt-auto pt-6 flex items-center gap-2">
+          <button
+            @click="back()"
+            class="px-3 py-1.5 text-sm rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-30"
+            :disabled="currentIndex <= 0"
+          >&larr; Atrás</button>
+          <button
+            @click="next()"
+            class="flex-1 px-3 py-1.5 text-sm font-medium rounded bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-30"
+            :disabled="currentIndex >= steps.length - 1"
+          >Siguiente &rarr;</button>
+          <button
+            @click="toggleAuto()"
+            class="px-3 py-1.5 text-sm rounded border border-slate-200 hover:bg-slate-100"
+            :class="autoMode ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : ''"
+          >
+            <span x-text="autoMode ? 'Pausar' : 'Auto'"></span>
+          </button>
+          <button
+            @click="skip()"
+            class="px-3 py-1.5 text-sm rounded border border-slate-200 hover:bg-slate-100"
+            title="Ir al final"
+          >&rdsh;</button>
+        </div>
+      </div>
+    </template>
+  </section>
+</div>
+
+<script src="{{ url_for('static', filename='studio.js') }}"></script>
+{% endblock %}

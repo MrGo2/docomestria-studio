@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}docomestria-studio{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+    <script
+      src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"
+      defer
+    ></script>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+    ></script>
+    <script>
+      window.addEventListener("load", function () {
+        if (window["pdfjsLib"]) {
+          window["pdfjsLib"].GlobalWorkerOptions.workerSrc =
+            "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        }
+      });
+    </script>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='studio.css') }}"
+    />
+  </head>
+  <body class="bg-slate-50 text-slate-900 min-h-screen">
+    <header class="border-b border-slate-200 bg-white">
+      <div class="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+        <a href="/" class="font-semibold tracking-tight text-slate-800">
+          docomestria<span class="text-slate-400">/studio</span>
+        </a>
+        <span class="text-xs text-slate-500">{% block subtitle %}{% endblock %}</span>
+      </div>
+    </header>
+    <main class="max-w-6xl mx-auto px-6 py-6">
+      {% block content %}{% endblock %}
+    </main>
+  </body>
+</html>
