@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-06-05
+
+### Changed
+- PDF + bbox overlay rendering rebuilt around an SVG viewBox in raw PDF
+  points. Canvas renders at fixed intrinsic 2x scale and is then sized to
+  the panel via plain CSS (`width: 100%` on canvas + SVG inside a wrapper
+  with the page's aspect-ratio). Result: full page is always visible, no
+  horizontal scrollbar, and bbox overlays line up exactly with the PDF
+  content regardless of viewport width or zoom.
+- Removed the ResizeObserver that re-rendered on every container resize —
+  cancellable render tasks were racing during initial layout and leaving the
+  canvas blank. CSS scaling handles resize for free now.
+
 ## [0.2.2] - 2026-06-05
 
 ### Fixed

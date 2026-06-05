@@ -12,9 +12,12 @@ function studioApp(sessionId) {
   // Kept OUT of reactive state: pdf.js objects use private class fields
   // that throw when accessed through Alpine's reactive Proxy.
   let pdfDoc = null;
-  let viewport = null;
   let renderTask = null;
   let initialized = false;
+  // Intrinsic render scale — keeps the canvas sharp on hi-DPI. CSS scales the
+  // canvas to fit the panel, and the SVG overlay uses a viewBox in PDF points
+  // so bboxes line up regardless of display size.
+  const INTRINSIC_SCALE = 2.0;
 
   return {
     sessionId,
@@ -31,9 +34,8 @@ function studioApp(sessionId) {
 
     currentPage: 1,
     totalPages: 1,
-    canvasWidth: 0,
-    canvasHeight: 0,
-    pdfScale: 1.5,
+    pageWidthPts: 0,      // PDF page width in points — drives SVG viewBox
+    pageHeightPts: 0,
 
     init() {
       if (initialized) return;
@@ -61,19 +63,18 @@ function studioApp(sessionId) {
         try { renderTask.cancel(); } catch (e) { /* ignore */ }
       }
       const page = await pdfDoc.getPage(pageNum);
+      // Page dimensions in PDF points (scale=1 -> 1 CSS px == 1 pt).
+      const pageVp = page.getViewport({ scale: 1 });
+      this.pageWidthPts = pageVp.width;
+      this.pageHeightPts = pageVp.height;
+      // Render to a fixed intrinsic resolution. CSS will scale the canvas
+      // display size to fit the panel via `width: 100%` on the canvas.
+      const renderVp = page.getViewport({ scale: INTRINSIC_SCALE });
       const canvas = this.$refs.pdfCanvas;
-      const container = canvas.parentElement;
-      // Fit viewport to container width (account for ~16px padding/scrollbar).
-      const baseViewport = page.getViewport({ scale: 1 });
-      const targetWidth = Math.max(200, (container?.clientWidth || 600) - 16);
-      this.pdfScale = targetWidth / baseViewport.width;
-      viewport = page.getViewport({ scale: this.pdfScale });
       const ctx = canvas.getContext("2d");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      this.canvasWidth = viewport.width;
-      this.canvasHeight = viewport.height;
-      renderTask = page.render({ canvasContext: ctx, viewport: viewport });
+      canvas.width = renderVp.width;
+      canvas.height = renderVp.height;
+      renderTask = page.render({ canvasContext: ctx, viewport: renderVp });
       try {
         await renderTask.promise;
       } catch (e) {
@@ -176,21 +177,25 @@ function studioApp(sessionId) {
       const svg = this.$refs.overlay;
       if (!svg) return;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
-      if (!this.step || !viewport) return;
+      if (!this.step || !this.pageWidthPts) return;
       const color = this.step.engine_color || "#6b7280";
       const bboxes = (this.step.bboxes || []).filter(
         (b) => !b.page || b.page === this.currentPage
       );
+      // Bbox coords are in PDF points (top-left origin); the SVG viewBox is
+      // set to (0 0 pageWidthPts pageHeightPts) so we can use raw PDF units
+      // directly. The browser handles all display scaling for us.
+      const strokeW = Math.max(0.6, this.pageWidthPts / 600);
       for (const bbox of bboxes) {
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-        rect.setAttribute("x", String(bbox.x * this.pdfScale));
-        rect.setAttribute("y", String(bbox.y * this.pdfScale));
-        rect.setAttribute("width", String(bbox.w * this.pdfScale));
-        rect.setAttribute("height", String(bbox.h * this.pdfScale));
+        rect.setAttribute("x", String(bbox.x));
+        rect.setAttribute("y", String(bbox.y));
+        rect.setAttribute("width", String(bbox.w));
+        rect.setAttribute("height", String(bbox.h));
         rect.setAttribute("fill", color);
         rect.setAttribute("fill-opacity", "0.18");
         rect.setAttribute("stroke", color);
-        rect.setAttribute("stroke-width", "1.2");
+        rect.setAttribute("stroke-width", String(strokeW));
         if (bbox.label) {
           const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
           title.textContent = bbox.label;

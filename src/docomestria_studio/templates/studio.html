@@ -34,14 +34,16 @@
         <span x-text="step?.engine || ''"></span>
       </span>
     </div>
-    <div class="relative bg-slate-100 rounded-md overflow-y-auto overflow-x-hidden" style="max-height:75vh">
-      <canvas x-ref="pdfCanvas" class="block mx-auto max-w-full"></canvas>
-      <svg
-        x-ref="overlay"
-        class="absolute top-0 left-0 pointer-events-none"
-        :width="canvasWidth"
-        :height="canvasHeight"
-      ></svg>
+    <div class="relative bg-slate-100 rounded-md overflow-hidden" style="max-height:75vh">
+      <div class="relative w-full" :style="`aspect-ratio: ${pageWidthPts || 1} / ${pageHeightPts || 1}`">
+        <canvas x-ref="pdfCanvas" class="absolute inset-0 w-full h-full block"></canvas>
+        <svg
+          x-ref="overlay"
+          class="absolute inset-0 w-full h-full pointer-events-none"
+          :viewBox="`0 0 ${pageWidthPts || 1} ${pageHeightPts || 1}`"
+          preserveAspectRatio="none"
+        ></svg>
+      </div>
     </div>
   </section>
 
