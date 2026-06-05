@@ -215,16 +215,21 @@ def _details_text_items(items: list[dict[str, Any]]) -> dict[str, Any]:
 def _details_blocks(blocks: list[dict[str, Any]]) -> dict[str, Any]:
     rows = []
     for b in blocks[:DETAILS_PREVIEW_LIMIT]:
-        rows.append(
-            {
-                "label": str(b.get("label", "") or ""),
-                "level": b.get("level"),
-                "layer": b.get("layer", "body") or "body",
-                "page": int(b.get("page", 1) or 1),
-                "bbox": list(b.get("bbox") or [0, 0, 0, 0]),
-                "summary": _block_summary(b),
-            }
-        )
+        row: dict[str, Any] = {
+            "label": str(b.get("label", "") or ""),
+            "level": b.get("level"),
+            "layer": b.get("layer", "body") or "body",
+            "page": int(b.get("page", 1) or 1),
+            "bbox": list(b.get("bbox") or [0, 0, 0, 0]),
+            "summary": _block_summary(b),
+        }
+        cells = b.get("cells")
+        if cells:
+            row["cells"] = [list(r) for r in cells]
+        contained = b.get("contained_text")
+        if contained:
+            row["contained_text"] = str(contained)
+        rows.append(row)
     return {"kind": "blocks", "rows": rows, "total": len(blocks)}
 
 
@@ -244,17 +249,22 @@ def _block_summary(block: dict[str, Any]) -> str:
 def _details_visual_rects(rects: list[dict[str, Any]]) -> dict[str, Any]:
     rows = []
     for r in rects[:DETAILS_PREVIEW_LIMIT]:
-        rows.append(
-            {
-                "rect_id": str(r.get("rect_id", "") or ""),
-                "rect_type": str(r.get("rect_type", "box") or "box"),
-                "is_filled": bool(r.get("is_filled", False)),
-                "page": int(r.get("page", 1) or 1),
-                "bbox": list(r.get("bbox") or [0, 0, 0, 0]),
-                "table_grid": r.get("table_grid"),
-                "summary": _rect_summary(r),
-            }
-        )
+        row: dict[str, Any] = {
+            "rect_id": str(r.get("rect_id", "") or ""),
+            "rect_type": str(r.get("rect_type", "box") or "box"),
+            "is_filled": bool(r.get("is_filled", False)),
+            "page": int(r.get("page", 1) or 1),
+            "bbox": list(r.get("bbox") or [0, 0, 0, 0]),
+            "table_grid": r.get("table_grid"),
+            "summary": _rect_summary(r),
+        }
+        cells = r.get("cells")
+        if cells:
+            row["cells"] = [list(c) for c in cells]
+        contained = r.get("contained_text")
+        if contained:
+            row["contained_text"] = str(contained)
+        rows.append(row)
     return {"kind": "visual_rects", "rows": rows, "total": len(rects)}
 
 

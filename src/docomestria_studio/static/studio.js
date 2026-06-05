@@ -29,6 +29,7 @@ function studioApp(sessionId) {
     steps: [],            // cached step JSON, indexed
     currentIndex: 0,
     step: null,
+    selectedRowIdx: null, // which detail row is selected for drill-down
     autoMode: false,
     autoTimer: null,
 
@@ -42,6 +43,9 @@ function studioApp(sessionId) {
       initialized = true;
       this.loadPdf();
       this.pollStatus();
+      // Re-draw the overlay when the user selects a row so the matching bbox
+      // gets the emphasised stroke. Alpine's $watch is the idiomatic hook.
+      this.$watch("selectedRowIdx", () => this.drawOverlay());
     },
 
     async loadPdf() {
@@ -127,6 +131,8 @@ function studioApp(sessionId) {
 
     async loadStep(index) {
       if (index < 0) return;
+      // Clear any drill-down selection from the previous step.
+      this.selectedRowIdx = null;
       if (this.steps[index]) {
         this.step = this.steps[index];
         this.currentIndex = index;
@@ -140,6 +146,13 @@ function studioApp(sessionId) {
       this.step = data;
       this.currentIndex = index;
       this.drawOverlay();
+    },
+
+    get selectedRow() {
+      if (this.selectedRowIdx === null || this.selectedRowIdx === undefined) return null;
+      const rows = this.step?.details?.rows;
+      if (!rows) return null;
+      return rows[this.selectedRowIdx] || null;
     },
 
     next() {
@@ -193,16 +206,26 @@ function studioApp(sessionId) {
       // set to (0 0 pageWidthPts pageHeightPts) so we can use raw PDF units
       // directly. The browser handles all display scaling for us.
       const strokeW = Math.max(0.6, this.pageWidthPts / 600);
+      const selectedBox = this.selectedRow?.bbox;
+      const bboxMatches = (a, b) => {
+        if (!a || !b) return false;
+        const tol = 0.5;
+        return Math.abs(a.x - b[0]) <= tol
+            && Math.abs(a.y - b[1]) <= tol
+            && Math.abs(a.w - b[2]) <= tol
+            && Math.abs(a.h - b[3]) <= tol;
+      };
       for (const bbox of bboxes) {
+        const isSelected = bboxMatches(bbox, selectedBox);
         const rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
         rect.setAttribute("x", String(bbox.x));
         rect.setAttribute("y", String(bbox.y));
         rect.setAttribute("width", String(bbox.w));
         rect.setAttribute("height", String(bbox.h));
         rect.setAttribute("fill", color);
-        rect.setAttribute("fill-opacity", "0.18");
+        rect.setAttribute("fill-opacity", isSelected ? "0.35" : "0.18");
         rect.setAttribute("stroke", color);
-        rect.setAttribute("stroke-width", String(strokeW));
+        rect.setAttribute("stroke-width", String(isSelected ? strokeW * 2.5 : strokeW));
         if (bbox.label) {
           const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
           title.textContent = bbox.label;
@@ -239,6 +262,23 @@ function studioApp(sessionId) {
         case "typed_fields": return `Campos tipados (${details.ok_count}/${details.total})`;
         default: return "Detalle";
       }
+    },
+
+    drillDownTitle(details, row) {
+      if (!details || !row) return "Detalle";
+      const kind = details.kind;
+      if (row.cells && row.cells.length) return "Contenido de la tabla";
+      if (kind === "blocks") {
+        if (row.label === "section_header") return "Texto del encabezado";
+        return "Texto del bloque";
+      }
+      if (kind === "visual_rects") {
+        if (row.rect_type === "checkbox") return "Casilla";
+        if (row.rect_type === "signature_field") return "Campo de firma";
+        return "Texto dentro del rectangulo";
+      }
+      if (kind === "text_items") return "Item de texto";
+      return "Detalle";
     },
 
     formatValue(value) {

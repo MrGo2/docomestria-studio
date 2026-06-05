@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.6] - 2026-06-05
+
+### Added
+- Click any row in the Docling / pdfplumber / LiteParse detail list to drill
+  down: tables render as actual HTML tables with their extracted cell text,
+  section headers and boxes show the LiteParse text contained inside their
+  bbox, and the corresponding PDF region is highlighted on the overlay with
+  a thicker stroke and stronger fill.
+- Requires `docomestria>=0.6.3` which exposes `cells` and `contained_text`
+  on streaming payload rows.
+
 ## [0.2.5] - 2026-06-05
 
 ### Added

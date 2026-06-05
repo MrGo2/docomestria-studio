@@ -351,6 +351,126 @@ def test_bbox_labels_populated_for_pdfplumber(fake_step_factory, fake_bbox_facto
     assert data["bboxes"][1]["label"] == "checkbox"
 
 
+# ============================================================================ drill-down (v0.2.6)
+
+
+def test_details_blocks_propagate_cells_for_tables(fake_step_factory):
+    """A Docling table block surfaces its `cells` matrix in details.rows."""
+    blocks = [
+        {
+            "label": "table",
+            "level": None,
+            "layer": "body",
+            "page": 1,
+            "bbox": [10, 50, 300, 200],
+            "text": "",
+            "cells": [["", "Datos Petición", ""], ["Nº Procedimiento", "987-15", ""]],
+        }
+    ]
+    step = fake_step_factory(
+        name="extract_docling",
+        title="t",
+        explanation="",
+        engine="docling",
+        step_index=1,
+        total_steps=9,
+        payload={"_blocks": blocks},
+    )
+    data = serialize_step(step)
+    row = data["details"]["rows"][0]
+    assert row["label"] == "table"
+    assert row["cells"] == [["", "Datos Petición", ""], ["Nº Procedimiento", "987-15", ""]]
+    # Non-table fields not present.
+    assert "contained_text" not in row
+
+
+def test_details_blocks_propagate_contained_text_for_headers(fake_step_factory):
+    """A non-table Docling block surfaces `contained_text` in details.rows."""
+    blocks = [
+        {
+            "label": "section_header",
+            "level": 1,
+            "layer": "body",
+            "page": 1,
+            "bbox": [5, 5, 200, 20],
+            "text": "Consulta",
+            "contained_text": "Consulta TGSS situacion",
+        }
+    ]
+    step = fake_step_factory(
+        name="extract_docling",
+        title="t",
+        explanation="",
+        engine="docling",
+        step_index=1,
+        total_steps=9,
+        payload={"_blocks": blocks},
+    )
+    data = serialize_step(step)
+    row = data["details"]["rows"][0]
+    assert row["label"] == "section_header"
+    assert row["contained_text"] == "Consulta TGSS situacion"
+    assert "cells" not in row
+
+
+def test_details_visual_rects_propagate_cells_for_tables(fake_step_factory):
+    """A pdfplumber table rect surfaces its `cells` matrix in details.rows."""
+    rects = [
+        {
+            "rect_id": "p1-t0",
+            "rect_type": "table",
+            "is_filled": False,
+            "page": 1,
+            "bbox": [10, 10, 200, 100],
+            "table_grid": "2 rows x 2 cols",
+            "cells": [["H1", "H2"], ["v1", "v2"]],
+        }
+    ]
+    step = fake_step_factory(
+        name="extract_pdfplumber",
+        title="t",
+        explanation="",
+        engine="pdfplumber",
+        step_index=1,
+        total_steps=9,
+        payload={"_rects": rects},
+    )
+    data = serialize_step(step)
+    row = data["details"]["rows"][0]
+    assert row["rect_type"] == "table"
+    assert row["cells"] == [["H1", "H2"], ["v1", "v2"]]
+    assert "contained_text" not in row
+
+
+def test_details_visual_rects_propagate_contained_text_for_boxes(fake_step_factory):
+    """A non-table pdfplumber rect surfaces `contained_text` in details.rows."""
+    rects = [
+        {
+            "rect_id": "p1-r0",
+            "rect_type": "box",
+            "is_filled": False,
+            "page": 1,
+            "bbox": [10, 10, 200, 100],
+            "table_grid": None,
+            "contained_text": "Apellidos GARCIA LOPEZ",
+        }
+    ]
+    step = fake_step_factory(
+        name="extract_pdfplumber",
+        title="t",
+        explanation="",
+        engine="pdfplumber",
+        step_index=1,
+        total_steps=9,
+        payload={"_rects": rects},
+    )
+    data = serialize_step(step)
+    row = data["details"]["rows"][0]
+    assert row["rect_type"] == "box"
+    assert row["contained_text"] == "Apellidos GARCIA LOPEZ"
+    assert "cells" not in row
+
+
 def test_details_none_for_steps_without_engine_data(fake_step_factory):
     step = fake_step_factory(
         name="start",
